@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Affectors — визуализация</title>
+    <title>Affectors — сеть, которая строит слова</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700&family=JetBrains+Mono:wght@400;600&display=swap">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -12,44 +13,83 @@
         <p class="tagline">visual playground</p>
     </header>
 
-    <main>
-        <section class="panel">
-            <h2>обучение</h2>
-            <p class="hint">слова через пробел или с новой строки — по ним строится граф блоков: SOS → символ → END</p>
-            <textarea id="words-input" rows="6" spellcheck="false">кот код ток крот лодка окно мода</textarea>
-            <div class="row">
-                <label class="file-btn">-txt
-                    <input type="file" id="file-input" accept=".txt">
-                </label>
-                <button id="train-btn" class="btn">обучить</button>
-                <span id="stats" class="stats"></span>
+    <h1>AffectorGraph · сеть, которая строит слова</h1>
+    <p class="sub">каждый блок — буква, плюс блок старта «^» и блок конца «$». возбудитель проигрывает слова —
+        связи учатся по front_affect и back_affect, затем активность идёт по графу сама:
+        каждая вспышка приклеивает букву, слово заканчивается, когда лавина гаснет или срабатывает «$»</p>
+
+    <div class="wrap">
+        <div class="panel stage">
+            <canvas id="g"></canvas>
+            <div id="cands" class="cands" aria-label="кандидаты следующей буквы"></div>
+            <div class="word"><div class="cur" id="cur">·</div><div class="st" id="curSt">нажми «Слушать словарь»</div></div>
+            <div class="hud">прослушано <b id="hHeard">0</b> · сказано <b id="hSaid">0</b><br>клик по букве: начать слово с неё</div>
+        </div>
+
+        <div class="ctl">
+            <section class="panel grp">
+                <h2>1 · Слушать</h2>
+                <textarea id="corpus" aria-label="Словарь"></textarea>
+                <div class="row">
+                    <button id="bListen" class="ext">Слушать словарь</button>
+                    <button id="bWipe">Стереть память</button>
+                </div>
+                <div class="prog"><i id="prog"></i></div>
+                <label>проходов по словарю <span id="vEp">3</span><input id="ep" type="range" min="1" max="20" value="3"></label>
+            </section>
+
+            <section class="panel grp">
+                <h2>2 · Говорить</h2>
+                <div class="row">
+                    <button id="bTalk">Говорить ∞</button>
+                    <button id="bOne">Одно слово</button>
+                </div>
+                <div class="row">
+                    <button id="bSelf">Самообучение: выкл</button>
+                </div>
+                <p class="hint">∞ — сеть говорит без остановки, слово за словом. самообучение подкрепляет собственные слова, законченные через «$»</p>
+                <label>букв в секунду <span id="vSp">4</span><input id="sp" type="range" min="1" max="14" value="4"></label>
+            </section>
+
+            <section class="panel grp">
+                <h2>3 · Параметры</h2>
+                <label>температура (шум) <span id="vT">0.35</span><input id="t" type="range" min="2" max="150" value="35"></label>
+                <label>порог затухания θ <span id="vTh">0.20</span><input id="th" type="range" min="0" max="100" value="20"></label>
+                <label>память на 2–3 шага назад <span id="vG2">1.00</span><input id="g2" type="range" min="0" max="200" value="100"></label>
+                <label>вес back_affect <span id="vBg">−0.30</span><input id="bg" type="range" min="-100" max="100" value="-30"></label>
+                <label>скорость обучения <span id="vLr">0.15</span><input id="lr" type="range" min="1" max="60" value="15"></label>
+                <label>забывание <span id="vFg">0.0005</span><input id="fg" type="range" min="0" max="50" value="5"></label>
+            </section>
+        </div>
+    </div>
+
+    <div class="lower">
+        <section class="panel card">
+            <h3>что сеть говорит</h3>
+            <div class="feed" id="feed"></div>
+            <div class="legend">
+                <span><i class="lg ok"></i>есть в словаре</span>
+                <span><i class="lg hot"></i>новое слово</span>
+                <span><i class="lg cut"></i>оборвано по длине</span>
             </div>
         </section>
-
-        <section class="panel">
-            <h2>генерация</h2>
-            <p class="hint">шаг по графу выбирается по front_affect формулам, посещённый блок забывает влияние (to_forgetting)</p>
-            <div class="row">
-                <button id="generate-one-btn" class="btn">слово</button>
-                <button id="generate-batch-btn" class="btn">5 слов</button>
-                <label class="slider-row">забывание
-                    <input type="range" id="forgetting" min="0" max="3" step="0.1" value="1">
-                    <span id="forgetting-value">1.0</span>
-                </label>
-                <label class="slider-row">длина
-                    <input type="range" id="max-len" min="4" max="16" step="1" value="12">
-                    <span id="max-len-value">12</span>
-                </label>
-            </div>
-            <div id="output" class="output"></div>
+        <section class="panel card">
+            <h3>счёт</h3>
+            <dl class="stats">
+                <dt>слов сказано</dt><dd id="sN">0</dd>
+                <dt>закончено через «$»</dt><dd id="sNat">—</dd>
+                <dt>из словаря</dt><dd id="sKnown">—</dd>
+                <dt>новых</dt><dd id="sNovel">—</dd>
+                <dt>средняя длина / в словаре</dt><dd id="sLen">—</dd>
+                <dt>среднее affection</dt><dd id="sA">—</dd>
+            </dl>
         </section>
-
-        <section class="panel">
-            <h2>матрица связей графа</h2>
-            <canvas id="heatmap" width="240" height="240"></canvas>
-            <p class="hint">светлый пиксель — связь блоков, голубым подсвечен путь генерации</p>
+        <section class="panel card">
+            <h3>новые слова сети</h3>
+            <div class="feed" id="novel"></div>
+            <p class="hint">уникальные, которых нет в словаре, по убыванию правдоподобия пар букв</p>
         </section>
-    </main>
+    </div>
 
     <footer>
         <p>affectors · simple graph-net library based on numpy &amp; torch</p>
