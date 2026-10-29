@@ -62,10 +62,10 @@ class AffectionBlockClassic:
     
     def get_probs(self, type: str):
         if type == "front":
-            affects = {key:self.transformations.sigmoid_classic(item) for key, item in self.to_front_affect()}
+            affects = {key:self.transformations.sigmoid_classic(item) for key, item in self.to_front_affect().items()}
             return affects
         elif type == "back":
-            affects = {key:self.transformations.sigmoid_classic(item) for key, item in self.to_back_affect()}
+            affects = {key:self.transformations.sigmoid_classic(item) for key, item in self.to_back_affect().items()}
             return affects
         else:
             return {}
