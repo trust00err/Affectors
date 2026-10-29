@@ -65,11 +65,19 @@ const I18N = {
 let LANG = localStorage.getItem('lang') || 'ru';
 const tr = (...a) => { const v = I18N[LANG][a[0]] ?? a[0]; return typeof v === 'function' ? v(a[1]) : v; };
 
-const AL = 'абвгдежзийклмнопрстуфхцчшщъыьэюя';
-const SYM = ['^', ...AL, '$'];
-const N = SYM.length, S0 = 0, SE = N - 1;
-const IX = {};
-SYM.forEach((c, i) => IX[c] = i);
+// буквы = всё, что реально встретилось в словаре: кириллица + латиница + цифры
+let SYM = [], N = 0, S0 = 0, SE = 0, IX = {};
+const LEGAL = /[а-яёa-z0-9]/;
+let lastAlph = '';
+function rebuildAlphabet(ws) {
+    const chars = new Set();
+    ws.forEach(w => [...w].forEach(ch => { if (LEGAL.test(ch)) chars.add(ch); }));
+    SYM = ['^', ...[...chars].sort(), '$'];
+    N = SYM.length; S0 = 0; SE = N - 1;
+    IX = {};
+    SYM.forEach((c, i) => IX[c] = i);
+    return SYM.slice().join('');
+}
 
 $('corpus').value = `дом мама папа кот небо река вода лес поле море гора свет луна солнце звезда ветер дождь снег
 утро вечер ночь день город улица окно дверь стол стул книга слово голос рука нога глаз сердце друг
@@ -86,6 +94,7 @@ function wipe() {
     W1 = new Float32Array(N * N); W2 = new Float32Array(N * N); W3 = new Float32Array(N * N);
     for (let k = 0; k < N * N; k++) { W1[k] = Math.random() * .004; W2[k] = Math.random() * .003; }
     base = new Float32Array(N).fill(.5); A = new Float32Array(N); heard = 0; said = 0; words = []; gen = null;
+    hl = new Float32Array(N); lastV = new Float32Array(N);
     $('feed').innerHTML = ''; $('novel').innerHTML = '';
     affection(); refreshStats();
 }
@@ -95,7 +104,7 @@ function affection() { for (let i = 0; i < N; i++) { let s = 0; for (let j = 0; 
 const front = (i, j) => { const d = Math.abs(A[j] - A[i]); return d * (A[j] / (A[i] + EPS)); };
 const back = (i, j) => { const d = Math.abs(A[j] - A[i]); return d * (A[i] / (A[j] + EPS)); };
 
-const clean = t => t.toLowerCase().replace(/ё/g, 'е').split(/[^а-я]+/).filter(w => w.length > 1);
+const clean = t => t.toLowerCase().replace(/ё/g, 'е').split(/[^а-яa-z]+/).filter(w => w.length > 1);
 function parseCorpus() {
     const ws = clean($('corpus').value);
     corpusSet = new Set(ws); corpusBig = new Set(); let L = 0;
@@ -203,6 +212,9 @@ function renderCands() {
 // ---------- прослушивание ----------
 function listen() {
     const ws = parseCorpus(); if (!ws.length) return;
+    // алфавит перестраивается под словарь; старая память с тем же алфавитом остаётся
+    const alph = rebuildAlphabet(ws);
+    if (alph !== lastAlph) { lastAlph = alph; wipe(); }
     listenQ = [];
     for (let e = 0; e < P.ep; e++) listenQ.push(...ws.slice().sort(() => Math.random() - .5));
     listenTotal = listenQ.length;
@@ -364,4 +376,8 @@ $('langBtn').onclick = () => {
 addEventListener('resize', () => fit(g));
 applyLang();
 $('curSt').textContent = tr('stIdle');
-fit(g); parseCorpus(); wipe(); requestAnimationFrame(loop);
+fit(g);
+const ws0 = parseCorpus();
+lastAlph = rebuildAlphabet(ws0);
+wipe();
+requestAnimationFrame(loop);
