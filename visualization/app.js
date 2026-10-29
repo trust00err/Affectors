@@ -5,6 +5,66 @@ const C = { sig: col('--sig'), hot: col('--hot'), ext: col('--ext'), line: col('
 const $ = id => document.getElementById(id);
 const sig = x => 1 / (1 + Math.exp(-x)), EPS = 1e-4, WMAX = 3, MAXLEN = 16;
 
+// ---------- интернационализация ----------
+const I18N = {
+    ru: {
+        h1: 'AffectorGraph · сеть, которая строит слова',
+        sub: 'каждый блок — буква, плюс блок старта «^» и блок конца «$». возбудитель проигрывает слова — связи учатся по front_affect и back_affect, затем активность идёт по графу сама: каждая вспышка приклеивает букву, слово заканчивается, когда лавина гаснет или срабатывает «$»',
+        hudHeard: 'прослушано', hudSaid: '· сказано',
+        hudClick: 'клик по букве: начать слово с неё',
+        g1: '1 · слушать', g2: '2 · говорить', g3: '3 · параметры',
+        bListen: 'Слушать словарь', bWipe: 'Стереть память',
+        lblEp: 'проходов по словарю',
+        bTalk: 'Говорить ∞', bOne: 'Одно слово',
+        talkOn: 'Замолчать', talkOff: 'Говорить ∞',
+        selfOn: 'Самообучение: вкл', selfOff: 'Самообучение: выкл',
+        hintTalk: '∞ — сеть говорит без остановки, слово за словом. самообучение подкрепляет собственные слова, законченные через «$»',
+        lblSp: 'букв в секунду',
+        lblT: 'температура (шум)', lblTh: 'порог затухания θ',
+        lblG2: 'память на 2–3 шага назад', lblBg: 'вес back_affect',
+        lblLr: 'скорость обучения', lblFg: 'забывание',
+        cSaid: 'что сеть говорит', cScore: 'счёт', cNovel: 'новые слова сети',
+        lgKnown: 'есть в словаре', lgNovel: 'новое слово', lgCut: 'оборвано по длине',
+        stN: 'слов сказано', stNat: 'закончено через «$»', stKnown: 'из словаря',
+        stNovel: 'новых', stLen: 'средняя длина / в словаре', stAff: 'среднее affection',
+        hintNovel: 'уникальные, которых нет в словаре, по убыванию правдоподобия пар букв',
+        stIdle: 'нажми «Слушать словарь»', stTalking: 'говорю…',
+        stListening: 'слушаю: возбудитель проигрывает слово',
+        stReady: 'готово. жми «Говорить ∞»', stWiped: 'память стёрта',
+        stEnd: 'закончено блоком «$»', stCut: 'оборвано: 16 букв', stFaded: 'лавина погасла (θ)',
+        stStart: s => `начал с «${s}»`,
+    },
+    en: {
+        h1: 'AffectorGraph · a network that builds words',
+        sub: 'each block is a letter, plus a start block «^» and an end block «$». an external driver speaks the words — connections learn via front_affect and back_affect — then the activity runs through the graph on its own: every flash glues one letter, the word ends when the avalanche dies out or «$» fires',
+        hudHeard: 'heard', hudSaid: '· said',
+        hudClick: 'click a letter: start the word there',
+        g1: '1 · listen', g2: '2 · speak', g3: '3 · parameters',
+        bListen: 'Listen to corpus', bWipe: 'Wipe memory',
+        lblEp: 'corpus passes',
+        bTalk: 'Speak ∞', bOne: 'One word',
+        talkOn: 'Be quiet', talkOff: 'Speak ∞',
+        selfOn: 'Self-learning: on', selfOff: 'Self-learning: off',
+        hintTalk: '∞ — the net speaks non-stop, word after word. self-learning reinforces its own words finished via «$»',
+        lblSp: 'letters per second',
+        lblT: 'temperature (noise)', lblTh: 'decay threshold θ',
+        lblG2: 'memory 2–3 steps back', lblBg: 'back_affect weight',
+        lblLr: 'learning rate', lblFg: 'forgetting',
+        cSaid: 'what the net says', cScore: 'score', cNovel: 'novel words',
+        lgKnown: 'from corpus', lgNovel: 'novel', lgCut: 'cut by length',
+        stN: 'words said', stNat: 'finished via «$»', stKnown: 'from corpus',
+        stNovel: 'novel', stLen: 'avg length / corpus', stAff: 'avg affection',
+        hintNovel: 'unique words missing from the corpus, sorted by bigram plausibility',
+        stIdle: 'press «Listen to corpus»', stTalking: 'talking…',
+        stListening: 'listening: the driver speaks a word',
+        stReady: 'done. press «Speak ∞»', stWiped: 'memory wiped',
+        stEnd: 'finished by block «$»', stCut: 'cut: 16 letters', stFaded: 'avalanche faded (θ)',
+        stStart: s => `started from «${s}»`,
+    },
+};
+let LANG = localStorage.getItem('lang') || 'ru';
+const tr = (...a) => { const v = I18N[LANG][a[0]] ?? a[0]; return typeof v === 'function' ? v(a[1]) : v; };
+
 const AL = 'абвгдежзийклмнопрстуфхцчшщъыьэюя';
 const SYM = ['^', ...AL, '$'];
 const N = SYM.length, S0 = 0, SE = N - 1;
@@ -106,10 +166,10 @@ function finish(how) {
         const known = corpusSet.has(w);
         const rec = { w, how, known, big: bigScore(w) };
         words.push(rec); if (words.length > 400) words.shift(); addChip(rec);
-        if (P.self && how === 'end' && w.length >= 2) learnSeq(w, P.lr * .25); // подкрепляем собственные слова
+        if (P.self && how === 'end' && w.length >= 2) learnSeq(w, P.lr * .25);
     }
     forget(); refreshStats();
-    $('curSt').textContent = how === 'end' ? 'закончено блоком «$»' : how === 'cut' ? 'оборвано: 16 букв' : 'лавина погасла (θ)';
+    $('curSt').textContent = how === 'end' ? tr('stEnd') : how === 'cut' ? tr('stCut') : tr('stFaded');
 }
 function bigScore(w) { const s = '^' + w + '$'; let k = 0; for (let i = 1; i < s.length; i++) if (corpusBig.has(s[i - 1] + s[i])) k++; return k / (s.length - 1); }
 function addChip(r) {
@@ -160,13 +220,13 @@ function listenTick(n) {
         const s = [S0, ...[...listenWord].map(c => IX[c]), SE];
         hl.fill(0); s.forEach((i, t) => hl[i] = Math.max(hl[i], .4 + .6 * t / s.length));
         renderStatic(listenWord);
-        $('curSt').textContent = 'слушаю: возбудитель проигрывает слово';
+        $('curSt').textContent = tr('stListening');
     }
     $('prog').style.width = (listenTotal ? 100 * (1 - listenQ.length / listenTotal) : 0) + '%';
     if (!listenQ.length) {
         $('bListen').classList.remove('on'); listenWord = null;
         affection(); refreshStats();
-        $('curSt').textContent = 'готово. жми «Говорить ∞»';
+        $('curSt').textContent = tr('stReady');
     }
 }
 function renderStatic(w) {
@@ -256,15 +316,15 @@ function loop(now) {
 // ---------- управление ----------
 function syncTalk() {
     $('bTalk').classList.toggle('on', P.talk);
-    $('bTalk').textContent = P.talk ? 'Замолчать' : 'Говорить ∞';
+    $('bTalk').textContent = P.talk ? tr('talkOn') : tr('talkOff');
 }
-$('bListen').onclick = listen;
-$('bWipe').onclick = () => { listenQ = []; listenWord = null; wipe(); $('cur').textContent = '·'; $('curSt').textContent = 'память стёрта'; renderCands(); };
+$('bListen').onclick = () => { $('curSt').textContent = tr('stTalking'); listen(); };
+$('bWipe').onclick = () => { listenQ = []; listenWord = null; wipe(); $('cur').textContent = '·'; $('curSt').textContent = tr('stWiped'); renderCands(); };
 $('bTalk').onclick = () => { if (listenQ.length) return; P.talk = !P.talk; syncTalk(); if (!P.talk && gen && !gen.done) gen.done = true; };
-$('bOne').onclick = () => { if (listenQ.length) return; P.talk = false; syncTalk(); startWord(); $('curSt').textContent = 'говорю…'; };
+$('bOne').onclick = () => { if (listenQ.length) return; P.talk = false; syncTalk(); startWord(); $('curSt').textContent = tr('stTalking'); };
 $('bSelf').onclick = e => {
     P.self = !P.self;
-    e.target.textContent = 'Самообучение: ' + (P.self ? 'вкл' : 'выкл');
+    e.target.textContent = tr(P.self ? 'selfOn' : 'selfOff');
     e.target.classList.toggle('on', P.self);
 };
 g.addEventListener('click', e => {
@@ -272,7 +332,7 @@ g.addEventListener('click', e => {
     const b = g.getBoundingClientRect(), d = devicePixelRatio || 1, mx = (e.clientX - b.left) * d, my = (e.clientY - b.top) * d;
     let best = -1, bd = 1e9;
     for (let i = 1; i < SE; i++) { const [x, y] = npos(i), q = Math.hypot(x - mx, y - my); if (q < bd) { bd = q; best = i; } }
-    if (bd < 24 * d) { P.talk = false; syncTalk(); startWord(best); $('curSt').textContent = `начал с «${SYM[best]}»`; }
+    if (bd < 24 * d) { P.talk = false; syncTalk(); startWord(best); $('curSt').textContent = tr('stStart', SYM[best]); }
 });
 
 const cnfg = [
@@ -286,5 +346,22 @@ cnfg.forEach(([id, out, f, dp]) => {
     el.oninput = up; up();
 });
 
+// переключатель языка RU/EN
+function applyLang() {
+    document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = tr(el.dataset.i18n); });
+    $('langBtn').textContent = LANG === 'ru' ? 'EN' : 'RU';
+    document.documentElement.lang = LANG;
+}
+$('langBtn').onclick = () => {
+    LANG = LANG === 'ru' ? 'en' : 'ru';
+    localStorage.setItem('lang', LANG);
+    applyLang();
+    if (gen && !gen.done) $('curSt').textContent = tr('stTalking');
+    else if (!listenQ.length) $('curSt').textContent = heard ? tr('stReady') : tr('stIdle');
+    syncTalk();
+};
+
 addEventListener('resize', () => fit(g));
+applyLang();
+$('curSt').textContent = tr('stIdle');
 fit(g); parseCorpus(); wipe(); requestAnimationFrame(loop);

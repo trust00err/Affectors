@@ -71,6 +71,60 @@ probs = block.get_probs()                        # вероятности чер
 | `.update_affection()` | пересчитать влияния по матрице связей |
 | `.get_probs()` | вероятности связей (softmax без self-связей) |
 
+## Генерация новых слов
+
+Генератор (`affectors/experiments.py`) строит граф блоков из переданных слов
+(строкой или из .txt-файла) и «склеивает» новые слова по `front_affect`-формулам
+с забыванием (`to_forgetting`):
+
+```python
+from affectors.experiments import SymbolTokenizer, Dataset, AffectorGenerator
+
+tokenizer = SymbolTokenizer('')
+dataset = Dataset(tokenizer, "кот код ток крот лодка окно мода")  # или "words.txt"
+generator = AffectorGenerator(dataset, forgetting = 1.0).fit()
+
+print(generator.generate_word())       # например: 'окода'
+print(generator.generate(n = 5))       # пачка слов
+```
+
+Каждый блок графа — буква, шаг генерации выбирается по силе влияния
+(`to_front_affect`), а посещённый блок «забывает» своё влияние через
+`to_forgetting(forgetting)` — тем самым слова не зацикливаются.
+
+### Пример на английском
+
+Алфавит токенизатора включает и латиницу — можно сразу подать английские слова
+и получить англоподобные неологизмы:
+
+```python
+from affectors.experiments import SymbolTokenizer, Dataset, AffectorGenerator
+
+tokenizer = SymbolTokenizer('')
+dataset = Dataset(tokenizer, "rain river wood tree house cloud light stone water")
+generator = AffectorGenerator(dataset, forgetting = 1.0).fit()
+
+print(generator.generate(5))
+# например: ['trouse', 'wain', 'righouse', 'ould', 'voody']
+```
+
+Слово не обязательно существует — граф собирает новое из знакомых переходов
+букв. Фильтр «только новизны» как в визуализации:
+
+```python
+known = set(dataset.words)
+novel = [w for w in generator.generate(20) if w not in known]
+```
+
+Бесконечный режим, как кнопка «Говорить ∞» на сайте:
+
+```python
+import time
+while True:
+    print(generator.generate_word(), flush = True)
+    time.sleep(0.3)
+```
+
 ## Сборка wheel-файла (для передачи без GitHub)
 
 ```bash

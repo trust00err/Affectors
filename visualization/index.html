@@ -8,91 +8,95 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
+    <button id="langBtn" class="lang" title="switch language">EN</button>
+
     <header class="hero">
         <img src="../docs/banner.jpg" alt="Affectors" class="banner">
         <p class="tagline">visual playground</p>
     </header>
 
-    <h1>AffectorGraph · сеть, которая строит слова</h1>
-    <p class="sub">каждый блок — буква, плюс блок старта «^» и блок конца «$». возбудитель проигрывает слова —
-        связи учатся по front_affect и back_affect, затем активность идёт по графу сама:
-        каждая вспышка приклеивает букву, слово заканчивается, когда лавина гаснет или срабатывает «$»</p>
+    <h1 data-i18n="h1">AffectorGraph · сеть, которая строит слова</h1>
+    <p class="sub" data-i18n="sub">каждый блок — буква, плюс блок старта «^» и блок конца «$». возбудитель проигрывает слова — связи учатся по front_affect и back_affect, затем активность идёт по графу сама: каждая вспышка приклеивает букву, слово заканчивается, когда лавина гаснет или срабатывает «$»</p>
 
     <div class="wrap">
         <div class="panel stage">
             <canvas id="g"></canvas>
             <div id="cands" class="cands" aria-label="кандидаты следующей буквы"></div>
-            <div class="word"><div class="cur" id="cur">·</div><div class="st" id="curSt">нажми «Слушать словарь»</div></div>
-            <div class="hud">прослушано <b id="hHeard">0</b> · сказано <b id="hSaid">0</b><br>клик по букве: начать слово с неё</div>
+            <div class="word"><div class="cur" id="cur">·</div><div class="st" id="curSt"></div></div>
+            <div class="hud">
+                <span data-i18n="hudHeard">прослушано</span> <b id="hHeard">0</b>
+                <span data-i18n="hudSaid">· сказано</span> <b id="hSaid">0</b><br>
+                <span data-i18n="hudClick">клик по букве: начать слово с неё</span>
+            </div>
         </div>
 
         <div class="ctl">
             <section class="panel grp">
-                <h2>1 · Слушать</h2>
-                <textarea id="corpus" aria-label="Словарь"></textarea>
+                <h2 data-i18n="g1">1 · слушать</h2>
+                <textarea id="corpus" aria-label="corpus"></textarea>
                 <div class="row">
-                    <button id="bListen" class="ext">Слушать словарь</button>
-                    <button id="bWipe">Стереть память</button>
+                    <button id="bListen" class="ext" data-i18n="bListen">Слушать словарь</button>
+                    <button id="bWipe" data-i18n="bWipe">Стереть память</button>
                 </div>
                 <div class="prog"><i id="prog"></i></div>
-                <label>проходов по словарю <span id="vEp">3</span><input id="ep" type="range" min="1" max="20" value="3"></label>
+                <label><span data-i18n="lblEp">проходов по словарю</span> <span id="vEp">3</span><input id="ep" type="range" min="1" max="20" value="3"></label>
             </section>
 
             <section class="panel grp">
-                <h2>2 · Говорить</h2>
+                <h2 data-i18n="g2">2 · говорить</h2>
                 <div class="row">
-                    <button id="bTalk">Говорить ∞</button>
-                    <button id="bOne">Одно слово</button>
+                    <button id="bTalk" data-i18n="bTalk">Говорить ∞</button>
+                    <button id="bOne" data-i18n="bOne">Одно слово</button>
                 </div>
                 <div class="row">
-                    <button id="bSelf">Самообучение: выкл</button>
+                    <button id="bSelf" data-i18n="selfOff">Самообучение: выкл</button>
                 </div>
-                <p class="hint">∞ — сеть говорит без остановки, слово за словом. самообучение подкрепляет собственные слова, законченные через «$»</p>
-                <label>букв в секунду <span id="vSp">4</span><input id="sp" type="range" min="1" max="14" value="4"></label>
+                <p class="hint" data-i18n="hintTalk">∞ — сеть говорит без остановки, слово за словом. самообучение подкрепляет собственные слова, законченные через «$»</p>
+                <label><span data-i18n="lblSp">букв в секунду</span> <span id="vSp">4</span><input id="sp" type="range" min="1" max="14" value="4"></label>
             </section>
 
             <section class="panel grp">
-                <h2>3 · Параметры</h2>
-                <label>температура (шум) <span id="vT">0.35</span><input id="t" type="range" min="2" max="150" value="35"></label>
-                <label>порог затухания θ <span id="vTh">0.20</span><input id="th" type="range" min="0" max="100" value="20"></label>
-                <label>память на 2–3 шага назад <span id="vG2">1.00</span><input id="g2" type="range" min="0" max="200" value="100"></label>
-                <label>вес back_affect <span id="vBg">−0.30</span><input id="bg" type="range" min="-100" max="100" value="-30"></label>
-                <label>скорость обучения <span id="vLr">0.15</span><input id="lr" type="range" min="1" max="60" value="15"></label>
-                <label>забывание <span id="vFg">0.0005</span><input id="fg" type="range" min="0" max="50" value="5"></label>
+                <h2 data-i18n="g3">3 · параметры</h2>
+                <label><span data-i18n="lblT">температура (шум)</span> <span id="vT">0.35</span><input id="t" type="range" min="2" max="150" value="35"></label>
+                <label><span data-i18n="lblTh">порог затухания θ</span> <span id="vTh">0.20</span><input id="th" type="range" min="0" max="100" value="20"></label>
+                <label><span data-i18n="lblG2">память на 2–3 шага назад</span> <span id="vG2">1.00</span><input id="g2" type="range" min="0" max="200" value="100"></label>
+                <label><span data-i18n="lblBg">вес back_affect</span> <span id="vBg">−0.30</span><input id="bg" type="range" min="-100" max="100" value="-30"></label>
+                <label><span data-i18n="lblLr">скорость обучения</span> <span id="vLr">0.15</span><input id="lr" type="range" min="1" max="60" value="15"></label>
+                <label><span data-i18n="lblFg">забывание</span> <span id="vFg">0.0005</span><input id="fg" type="range" min="0" max="50" value="5"></label>
             </section>
         </div>
     </div>
 
     <div class="lower">
         <section class="panel card">
-            <h3>что сеть говорит</h3>
+            <h3 data-i18n="cSaid">что сеть говорит</h3>
             <div class="feed" id="feed"></div>
             <div class="legend">
-                <span><i class="lg ok"></i>есть в словаре</span>
-                <span><i class="lg hot"></i>новое слово</span>
-                <span><i class="lg cut"></i>оборвано по длине</span>
+                <span><i class="lg ok"></i><span data-i18n="lgKnown">есть в словаре</span></span>
+                <span><i class="lg hot"></i><span data-i18n="lgNovel">новое слово</span></span>
+                <span><i class="lg cut"></i><span data-i18n="lgCut">оборвано по длине</span></span>
             </div>
         </section>
         <section class="panel card">
-            <h3>счёт</h3>
+            <h3 data-i18n="cScore">счёт</h3>
             <dl class="stats">
-                <dt>слов сказано</dt><dd id="sN">0</dd>
-                <dt>закончено через «$»</dt><dd id="sNat">—</dd>
-                <dt>из словаря</dt><dd id="sKnown">—</dd>
-                <dt>новых</dt><dd id="sNovel">—</dd>
-                <dt>средняя длина / в словаре</dt><dd id="sLen">—</dd>
-                <dt>среднее affection</dt><dd id="sA">—</dd>
+                <dt data-i18n="stN">слов сказано</dt><dd id="sN">0</dd>
+                <dt data-i18n="stNat">закончено через «$»</dt><dd id="sNat">—</dd>
+                <dt data-i18n="stKnown">из словаря</dt><dd id="sKnown">—</dd>
+                <dt data-i18n="stNovel">новых</dt><dd id="sNovel">—</dd>
+                <dt data-i18n="stLen">средняя длина / в словаре</dt><dd id="sLen">—</dd>
+                <dt data-i18n="stAff">среднее affection</dt><dd id="sA">—</dd>
             </dl>
         </section>
         <section class="panel card">
-            <h3>новые слова сети</h3>
+            <h3 data-i18n="cNovel">новые слова сети</h3>
             <div class="feed" id="novel"></div>
-            <p class="hint">уникальные, которых нет в словаре, по убыванию правдоподобия пар букв</p>
+            <p class="hint" data-i18n="hintNovel">уникальные, которых нет в словаре, по убыванию правдоподобия пар букв</p>
         </section>
     </div>
 
     <footer>
-        <p>affectors · simple graph-net library based on numpy &amp; torch</p>
+        <p>affectors · simple graph-net library based on custom formula</p>
     </footer>
 
     <script src="app.js"></script>

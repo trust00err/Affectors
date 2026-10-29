@@ -41,6 +41,15 @@ a, p { min-width: 0; }
     margin-bottom: 14px;
 }
 
+.lang {
+    position: absolute;
+    top: 18px;
+    right: 18px;
+    z-index: 2;
+    font-size: 12px;
+    letter-spacing: 1px;
+}
+
 .banner {
     width: 100%;
     border-radius: 4px;
