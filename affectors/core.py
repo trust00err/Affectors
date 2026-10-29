@@ -57,8 +57,13 @@ class AffectionBlockClassic:
     def block(self):
         return {"input_blocks": self.input_blocks, "out_blocks": self.out_blocks, "idx":self.idx, "affection": self.affection}
 
+    @property
     def affection(self):
-        return self.affection
+        return self._affection
+
+    @affection.setter
+    def affection(self, value):
+        self._affection = value
     
     def get_probs(self, type: str):
         if type == "front":
