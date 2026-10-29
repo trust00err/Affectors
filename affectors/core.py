@@ -57,11 +57,19 @@ class AffectionBlockClassic:
     def block(self):
         return {"input_blocks": self.input_blocks, "out_blocks": self.out_blocks, "idx":self.idx, "affection": self.affection}
 
-    def out(self):
+    def affection(self):
         return self.affection
-
-    def out_sigmoid(self):
-        return self.transformations.sigmoid_classic(self.affection)
+    
+    def get_probs(self, type: str):
+        if type == "front":
+            affects = {key:self.transformations.sigmoid_classic(item) for key, item in self.to_front_affect()}
+            return affects
+        elif type == "back":
+            affects = {key:self.transformations.sigmoid_classic(item) for key, item in self.to_back_affect()}
+            return affects
+        else:
+            return {}
+        
 
 class AffectionBlock:
     def __init__(self, size, epsilon, base_affection):
