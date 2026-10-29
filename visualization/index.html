@@ -15,7 +15,7 @@
     <main>
         <section class="panel">
             <h2>обучение</h2>
-            <p class="hint">слова через пробел или с новой строки — модель учит биграммы символов</p>
+            <p class="hint">слова через пробел или с новой строки — по ним строится граф блоков: SOS → символ → END</p>
             <textarea id="words-input" rows="6" spellcheck="false">кот код ток крот лодка окно мода</textarea>
             <div class="row">
                 <label class="file-btn">-txt
@@ -24,17 +24,18 @@
                 <button id="train-btn" class="btn">обучить</button>
                 <span id="stats" class="stats"></span>
             </div>
-            <label class="slider-row">temperature
-                <input type="range" id="temperature" min="0.5" max="2.5" step="0.1" value="1">
-                <span id="temperature-value">1.0</span>
-            </label>
         </section>
 
         <section class="panel">
             <h2>генерация</h2>
+            <p class="hint">шаг по графу выбирается по front_affect формулам, посещённый блок забывает влияние (to_forgetting)</p>
             <div class="row">
                 <button id="generate-one-btn" class="btn">слово</button>
                 <button id="generate-batch-btn" class="btn">5 слов</button>
+                <label class="slider-row">забывание
+                    <input type="range" id="forgetting" min="0" max="3" step="0.1" value="1">
+                    <span id="forgetting-value">1.0</span>
+                </label>
                 <label class="slider-row">длина
                     <input type="range" id="max-len" min="4" max="16" step="1" value="12">
                     <span id="max-len-value">12</span>
@@ -44,9 +45,9 @@
         </section>
 
         <section class="panel">
-            <h2>матрица биграмм</h2>
+            <h2>матрица связей графа</h2>
             <canvas id="heatmap" width="240" height="240"></canvas>
-            <p class="hint">строка — текущий символ, столбец — следующий</p>
+            <p class="hint">светлый пиксель — связь блоков, голубым подсвечен путь генерации</p>
         </section>
     </main>
 

@@ -1,4 +1,4 @@
-// логика повторяет affectors/experiments.py: SymbolTokenizer + bigram WordGenerator
+// логика повторяет affectors/experiments.py: граф блоков + front_affect + to_forgetting
 
 const ALPHABET =
     ' абвгдежзийклмнопрстуфхцчшщъыьэюя' +
@@ -6,96 +6,124 @@ const ALPHABET =
     'abcdefghijklmnopqrstuvwxyz' +
     'ABCDEFGHIJKLMNOPQRSTUVWXYZ' +
     '0123456789';
-const SPECIAL = ['<|SOS|>', '<|END|>'];
+const EPS = 1e-5;
 
 function buildVocab() {
     const t2i = {};
     for (let i = 0; i < ALPHABET.length; i++) t2i[ALPHABET[i]] = i;
-    for (let i = 0; i < SPECIAL.length; i++) t2i[SPECIAL[i]] = ALPHABET.length + i;
     const i2t = {};
     for (const [t, i] of Object.entries(t2i)) i2t[i] = t;
     return { t2i, i2t };
 }
 
 const { t2i, i2t } = buildVocab();
-const VOCAB = Object.keys(t2i).length;
-const SOS = t2i[SPECIAL[0]];
-const END = t2i[SPECIAL[1]];
+const SOS = ALPHABET.length; // SOS-индекса нет в алфавите, даём его отдельно; END — свой на каждое слово
 
 const wordsInput = document.getElementById('words-input');
 const fileInput = document.getElementById('file-input');
 const trainBtn = document.getElementById('train-btn');
 const statsEl = document.getElementById('stats');
-const temperatureSlider = document.getElementById('temperature');
-const temperatureValue = document.getElementById('temperature-value');
+const forgettingSlider = document.getElementById('forgetting');
+const forgettingValue = document.getElementById('forgetting-value');
 const maxLenSlider = document.getElementById('max-len');
 const maxLenValue = document.getElementById('max-len-value');
 const outputEl = document.getElementById('output');
 const canvas = document.getElementById('heatmap');
 
-let prob = null; // матрица биграмм, null = не обучена
-
-function parseWords() {
-    return wordsInput.value.split(/\s+/).filter(w => w.length > 0);
-}
+let nodes = {};      // id -> {in:Set, out:Set, base, aff} — блоки AffectionBlockClassic
+let endIds = new Set(); // id END-блоков (свой на слово)
+let edges = new Set();  // "a>b" — матрица связей
+let maxId = 0;
+let pathEdges = [];     // путь текущей генерации для подсветки
 
 function trainOn(words) {
-    prob = Array.from({ length: VOCAB }, () => new Float32Array(VOCAB));
-    for (const word of words) {
-        const ok = [...word].every(ch => ch in t2i);
-        if (!ok) continue;
-        const ids = [SOS, ...[...word].map(ch => t2i[ch]), END];
-        for (let i = 0; i < ids.length - 1; i++) prob[ids[i]][ids[i + 1]]++;
+    nodes = {};
+    endIds = new Set();
+    edges = new Set();
+    pathEdges = [];
+    maxId = ALPHABET.length;
+    const ensure = id =>
+        (nodes[id] ??= { in: new Set(), out: new Set(), base: 1, aff: 0 });
+    for (let k = 0; k < words.length; k++) {
+        if (![...words[k]].every(ch => ch in t2i)) continue; // слово с посторонними символами пропускаем
+        const endId = ALPHABET.length + k; // личный END каждого слова
+        endIds.add(endId);
+        maxId = Math.max(maxId, endId);
+        ensure(endId);
+        const ids = [SOS, ...[...words[k]].map(ch => t2i[ch]), endId];
+        for (let i = 0; i < ids.length - 1; i++) {
+            const a = ids[i], b = ids[i + 1];
+            ensure(a).out.add(b);
+            ensure(b).in.add(a);
+            edges.add(`${a}>${b}`);
+        }
     }
-    for (let i = 0; i < VOCAB; i++) {
-        let sum = 0;
-        for (let j = 0; j < VOCAB; j++) sum += prob[i][j];
-        if (sum > 0) for (let j = 0; j < VOCAB; j++) prob[i][j] /= sum;
-    }
-    drawHeatmap();
-    statsEl.textContent = `${words.length} слов, ${VOCAB} токенов`;
+    resetAffections();
+    drawGraph();
+    const edgeCount = edges.size;
+    statsEl.textContent = `${words.length} слов, ${Object.keys(nodes).length} блоков, ${edgeCount} связей`;
 }
 
-function sampleNext(idx) {
-    const row = prob[idx];
+function resetAffections() {
+    for (const node of Object.values(nodes)) {
+        node.base = 1;
+        node.aff = node.base + node.in.size; // affection = входы + base — как в AffectionBlockClassic
+    }
+}
+
+function frontAffect(cur) { // формула AffectionBlockClassic.to_front_affect
+    const affects = [];
+    for (const outId of nodes[cur.id].out) {
+        const out = nodes[outId];
+        const val = Math.abs(out.aff - cur.aff) * (out.aff / (cur.aff + EPS));
+        if (val > 0) affects.push([outId, val]);
+    }
+    return affects;
+}
+
+function forgettingStep(node) { // AffectionBlockClassic.to_forgetting
+    const f = parseFloat(forgettingSlider.value);
+    node.base *= Math.exp(-f);
+    node.aff = node.base + node.in.size;
+}
+
+function sampleNext(affects) {
+    if (affects.length === 0) return null;
     let sum = 0;
-    for (const p of row) sum += p;
-    if (sum === 0) return END;
-    const t = parseFloat(temperatureSlider.value);
-    // вероятности со степенью 1/t, нормируем, сэмплируем накоплением
-    const weights = new Float32Array(VOCAB);
-    let norm = 0;
-    for (let j = 0; j < VOCAB; j++) {
-        weights[j] = Math.pow(row[j], 1 / t);
-        norm += weights[j];
-    }
+    for (const [, w] of affects) sum += w;
     let acc = 0;
-    const target = Math.random() * norm;
-    for (let j = 0; j < VOCAB; j++) {
-        acc += weights[j];
-        if (acc >= target) return j;
+    const target = Math.random() * sum;
+    for (const [id, w] of affects) {
+        acc += w;
+        if (acc >= target) return id;
     }
-    return END;
+    return affects[affects.length - 1][0];
 }
 
 async function generateWord(maxLen) {
-    if (!prob) return null;
-    let ids = [];
-    let cur = SOS;
-    while (ids.length < maxLen) {
-        cur = sampleNext(cur);
-        if (cur === END) break;
-        ids.push(cur);
-        outputWordPartial(ids); // посимвольная анимация
-        await sleep(60);
+    if (Object.keys(nodes).length === 0) return;
+    resetAffections();
+    pathEdges = [];
+    const ids = [];
+    let curId = SOS; // старт traversal из SOS-блока
+    for (let step = 0; step < maxLen; step++) {
+        const node = nodes[curId];
+        const affects = frontAffect(node);
+        const nxt = sampleNext(affects);
+        if (nxt === null || endIds.has(nxt)) break;
+        pathEdges.push(`${curId}>${nxt}`);
+        curId = nxt;
+        ids.push(nxt);
+        forgettingStep(nodes[nxt]);
+        if (nxt in i2t) outputEl.lastElementChild.textContent += i2t[nxt];
+        drawGraph();
+        await sleep(70);
     }
-    return ids.map(i => i2t[i]).join('');
+    drawGraph();
 }
 
-function outputWordPartial(ids) {
-    const word = ids.map(i => i2t[i]).join('');
-    const el = outputEl.lastElementChild;
-    if (el) el.textContent = word;
+function sleep(ms) {
+    return new Promise(res => setTimeout(res, ms));
 }
 
 function addWordSlot() {
@@ -105,24 +133,17 @@ function addWordSlot() {
     outputEl.appendChild(span);
 }
 
-function sleep(ms) {
-    return new Promise(res => setTimeout(res, ms));
-}
-
-function drawHeatmap() {
+function drawGraph() {
     const ctx = canvas.getContext('2d');
-    const cell = 4; // 1 токен = 4px, показываем плотную зону алфавита
-    const visible = Math.min(VOCAB, 60);
+    const cell = canvas.width / (maxId + 1);
+    const pathSet = new Set(pathEdges);
     ctx.fillStyle = '#191b16';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-    for (let i = 0; i < visible; i++) {
-        for (let j = 0; j < visible; j++) {
-            if (!prob) continue;
-            const v = prob[i][j];
-            ctx.fillStyle = v > 0.9 ? '#c8f2ff' : v > 0.5 ? '#7ab8cb' : v > 0.2
-                ? '#4a6a75' : v > 0 ? '#2a3a40' : '#212420';
-            ctx.fillRect(i * cell, j * cell, cell, cell);
-        }
+    for (const key of edges) {
+        const [a, b] = key.split('>').map(Number);
+        const lit = pathSet.has(key);
+        ctx.fillStyle = lit ? '#c8f2ff' : '#3a4238';
+        ctx.fillRect(a * cell, b * cell, cell, cell);
     }
 }
 
@@ -142,25 +163,28 @@ fileInput.addEventListener('change', () => {
 document.getElementById('generate-one-btn').addEventListener('click', () => {
     outputEl.innerHTML = '';
     addWordSlot();
-    generateWord(parseInt(maxLenSlider.value)).catch(() => {});
+    generateWord(parseInt(maxLenSlider.value));
 });
 
 document.getElementById('generate-batch-btn').addEventListener('click', async () => {
     outputEl.innerHTML = '';
-    if (!prob) return;
     for (let k = 0; k < 5; k++) {
         addWordSlot();
         await generateWord(parseInt(maxLenSlider.value));
     }
 });
 
-temperatureSlider.addEventListener('input', () => {
-    temperatureValue.textContent = parseFloat(temperatureSlider.value).toFixed(1);
+forgettingSlider.addEventListener('input', () => {
+    forgettingValue.textContent = parseFloat(forgettingSlider.value).toFixed(1);
 });
 
 maxLenSlider.addEventListener('input', () => {
     maxLenValue.textContent = maxLenSlider.value;
 });
+
+function parseWords() {
+    return wordsInput.value.split(/\s+/).filter(w => w.length > 0);
+}
 
 // старт: сразу обучаем на словах из поля ввода
 trainOn(parseWords());

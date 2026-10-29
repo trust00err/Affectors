@@ -1,7 +1,5 @@
 import os
-
-import numpy as np
-import torch
+import random
 
 from affectors.core import AffectionBlockClassic, Transformations
 import string
@@ -57,44 +55,69 @@ class Dataset:
         self.words += [w for w in words if w]
 
 
-class WordGenerator:
-    def __init__(self, dataset: Dataset, temperature = 1.0):
+class AffectorGenerator:
+    def __init__(self, dataset: Dataset, forgetting = 1.0):
+        """forgetting — затухание base_affection блока при каждом его посещении (to_forgetting)"""
         self.dataset = dataset
-        self.temperature = temperature
-        self.sos = dataset.tokenizer.t2i['<|SOS|>']
-        self.end = dataset.tokenizer.t2i['<|END|>']
-        self.size = len(dataset.tokenizer.t2i)
-        self.prob = np.zeros((self.size, self.size), dtype = 'float32')
+        self.forgetting = forgetting
+        self.nodes = {}
 
     def fit(self):
-        """биграммы: SOS -> c1 -> c2 ... -> END"""
-        encode = self.dataset.tokenizer.encode
+        """по каждому слову строится цепочка блоков: SOS -> c1 -> c2 ... -> END
+        связи без счётчиков — либо ребро есть, либо нет
+        END-блок свой для каждого слова, иначе он собирает все входы и стягивает шаги в конец"""
+        tok = self.dataset.tokenizer
+        sos = tok.t2i['<|SOS|>']
+        edges_in, edges_out = {}, {}
+        next_end_idx = len(tok.t2i)
+        self.end_idxs = set()
         for word in self.dataset.words:
-            ids = [self.sos] + encode(word) + [self.end]
+            ids = [sos] + tok.encode(word) + [next_end_idx]
+            self.end_idxs.add(next_end_idx)
+            next_end_idx += 1
             for a, b in zip(ids, ids[1:]):
-                self.prob[a, b] += 1
-        rows = self.prob.sum(axis = 1, keepdims = True)
-        self.prob = np.divide(self.prob, rows, out = np.zeros_like(self.prob), where = rows > 0)
+                edges_out.setdefault(a, set()).add(b)
+                edges_in.setdefault(b, set()).add(a)
+        self._build_graph(edges_in, edges_out)
         return self
 
-    def _sample_next(self, idx):
-        row = torch.from_numpy(self.prob[idx])
-        if row.sum() == 0:
-            return self.end
-        if self.temperature != 1.0:
-            row = row ** (1.0 / self.temperature)
-            row = row / row.sum()
-        return int(torch.multinomial(row, 1).item())
+    def _build_graph(self, edges_in, edges_out):
+        self.nodes = {idx: AffectionBlockClassic(idx = idx) for idx in set(edges_in) | set(edges_out)}
+        for idx, node in self.nodes.items():
+            node.input_blocks = [self.nodes[b] for b in edges_in.get(idx, ())]
+            node.out_blocks = [self.nodes[b] for b in edges_out.get(idx, ())]
+        for node in self.nodes.values():
+            node.base_affection = 1.0
+            node.affection = node.base_affection + len(node.input_blocks)
+
+    def _reset_affections(self):
+        for node in self.nodes.values():
+            node.base_affection = 1.0
+            node.affection = node.base_affection + len(node.input_blocks)
+
+    def _sample_next(self, node):
+        affects = node.to_front_affect()
+        weights = {i: a for i, a in affects.items() if a > 0}
+        if not weights:
+            return None
+        idxs, w = zip(*weights.items())
+        return random.choices(idxs, weights = w)[0]
 
     def generate_word(self, max_len = 12):
+        """шаг по графу: front_affect формулы между блоками,
+        посещённый блок забывает своё влияние (to_forgetting)"""
+        tok = self.dataset.tokenizer
+        self._reset_affections()
         ids = []
-        cur = self.sos
-        while len(ids) < max_len:
-            cur = self._sample_next(cur)
-            if cur == self.end:
+        cur = self.nodes[tok.t2i['<|SOS|>']]
+        for _ in range(max_len):
+            nxt = self._sample_next(cur)
+            if nxt is None or nxt in self.end_idxs:
                 break
-            ids.append(cur)
-        return self.dataset.tokenizer.decode(ids)
+            cur = self.nodes[nxt]
+            ids.append(nxt)
+            cur.to_forgetting(self.forgetting)
+        return tok.decode(ids)
 
     def generate(self, n = 5, max_len = 12):
         return [self.generate_word(max_len) for _ in range(n)]
@@ -103,7 +126,7 @@ class WordGenerator:
 if __name__ == "__main__":
     tokenizer = SymbolTokenizer('')
     dataset = Dataset(tokenizer, ["кот", "код", "ток", "крот", "лодка", "окно", "мода"])
-    generator = WordGenerator(dataset).fit()
+    generator = AffectorGenerator(dataset).fit()
 
     print("слова из датасета:", dataset.words)
     print("сгенерированные:", generator.generate())
