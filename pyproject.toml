@@ -1,0 +1,34 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "affectors"
+version = "0.1.0"
+description = "Affection propagation blocks (AffectorCore) на numpy/torch"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [
+    { name = "Yura" },
+]
+keywords = ["affect", "propagation", "numpy", "torch", "graph"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Intended Audience :: Science/Research",
+]
+dependencies = [
+    "numpy>=1.23",
+    "torch>=1.12",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "build",
+]
+
+[tool.setuptools.packages.find]
+include = ["affectors*"]
