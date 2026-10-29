@@ -8,8 +8,8 @@ def test_classic_block_affect():
     block0 = AffectionBlockClassic(idx=0, base_affection=0.5)
     block1 = AffectionBlockClassic(idx=1, input_blocks=[block0], base_affection=0.3)
 
-    assert block0.affection == 0.5
-    assert block1.affection == 1.3  # len(input_blocks) + base_affection
+    assert block0.get_affection() == 0.5
+    assert block1.get_affection() == 1.3  # len(input_blocks) + base_affection
 
     front = block0.to_front_affect()
     assert front == {}  # у block0 нет исходящих блоков
