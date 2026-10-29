@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.9"
 license = { text = "MIT" }
 authors = [
-    { name = "trus00err" },
+    { name = "trust00err" },
 ]
 keywords = ["affect", "propagation", "numpy", "torch", "graph"]
 classifiers = [
