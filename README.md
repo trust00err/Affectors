@@ -12,13 +12,13 @@
 ### Из GitHub
 
 ```bash
-pip install git+https://github.com/<ваш-логин>/affectors.git
+pip install git+https://github.com/trust00err/affectors.git
 ```
 
 ### Для разработки (editable-режим)
 
 ```bash
-git clone https://github.com/<ваш-логин>/affectors.git
+git clone https://github.com/trust00err/affectors.git
 cd affectors
 pip install -e .
 ```
