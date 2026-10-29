@@ -34,7 +34,7 @@ transformations = Transformations()
 block0 = AffectionBlockClassic(idx=0, base_affection=0.5, transformations=transformations)
 block1 = AffectionBlockClassic(idx=1, input_blocks=[block0], base_affection=0.3, transformations=transformations)
 
-print(block0.out())           # само влияние
+print(block0.affection)       # само влияние
 print(block0.out_sigmoid())   # влияние через сигмоиду
 ```
 
